@@ -1,0 +1,413 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <locale.h>
+#include <sys\stat.h>
+#include <cctype>
+#include <ctype.h>
+#include <errno.h>
+#include <string.h>
+
+#define DBG if(0)
+
+const char INPUT[]    = "input.txt";
+const char SOUTPUT[]  = "straight_output.txt";
+const char ROUTPUT[]  = "reverse_output.txt";
+const char FULLTEXT[] = "full_text.txt";
+
+//!---------------------------------------------------
+//! gets size of file in bytes
+//!
+//! @param [in] fileName name of file or filepath
+//!
+//! @return size of file in bytes
+//!
+//! @note size of file in bytes often is bigger than
+//!       number of char symbols in file
+//!----------------------------------------------------
+
+int getFileSize (const char* fileName);
+
+//!-------------------------------------------------------
+//!         reads data from file to storage
+//!
+//! @param  [in] fileName name of file or filepath
+//!
+//! @return storage consisting data from file
+//!
+//! @note   returns string that is not normal for c
+//!         format of string is "\0...other symbols...\0"
+//!-------------------------------------------------------
+
+char* readToStorage (const char* fileName);
+
+//!--------------------------------------------------------------------------
+//!         converts sting formated like
+//!         "\0 ... other symbols ... \0 ... other symbols ... "
+//!         to array of strings formated like"\0...other symbols...\0"
+//!
+//! @param  [in] storage buffer consisting string formated like
+//!                     "\0 ... other symbols ... \0 ... other symbols ... "
+//! @param  [in] nStr    number of string formated like"\0...other symbols...\0"
+//!                     in buffer
+//! @return array of strings type formated like"\0...other symbols...\0"
+//!
+//!---------------------------------------------------------------------------
+
+char** makeText (char* storage, int nStr);
+
+//!---------------------------------------------------------------------------
+//!        changes every '\n' symbol in string into '\0'.
+//!        It helps to devide string consisting full text into many strings
+//!
+//! @param [in] storage buffer consisting string
+//!
+//!
+//!
+//!
+
+int deleteSpaces (char* storage);
+
+int strCompareStraight (const char* str1, const char* str2);
+
+int strCompareReverse (const char* str1, const char* str2);
+
+int straightComparator (const void* member1, const void* member2);
+
+int reverseComporator  (const void* member1, const void* member2);
+
+void storageOutput (char* storage, const int nStr, const char* fileName);
+
+void testGetFileSize (const char* fileName, int sz);
+
+void textOutputStraight (char** text,const int nStr, const char* fileName);
+
+void textOutputReverse  (char** text,const int nStr, const char* fileName);
+
+//void chQSort ( char** text, const int nStr, * (int
+
+void testMakeText (char* storage, char* exampleS, int nStr);
+
+void showText (char** text, int nStr);
+
+void testReadToStorage ();
+
+int main()
+{
+
+    setlocale (LC_ALL, "Russian");
+
+    char* storage = readToStorage (INPUT);
+
+    int nStr = deleteSpaces (storage);
+
+    char** text = makeText (storage, nStr);
+
+    qsort (text, nStr, sizeof(char*), straightComparator );
+
+    DBG showText (text, nStr);
+
+    textOutputStraight (text, nStr, SOUTPUT);
+
+    qsort (text+1, nStr, sizeof(char*), reverseComporator );
+
+    textOutputReverse (text+1, nStr, ROUTPUT);
+
+    storageOutput (storage, nStr, FULLTEXT);
+
+    return 0;
+}
+
+int getFileSize (const char* fileName)
+{
+
+    struct stat buff;
+    stat( fileName, &buff);
+    return buff.st_size;
+
+}
+
+//----------------------------------------------------
+
+char* readToStorage (const char* fileName)
+{
+
+    FILE* input;
+    input = fopen (fileName, "rb");
+
+    int fileSz = getFileSize(fileName);
+    char* buffer   = (char*) calloc (fileSz + 2 , sizeof (*buffer));
+
+    buffer[0] = '\0';
+    fread (buffer + 1, sizeof(char), fileSz, input);
+    *(buffer + fileSz + 2) = '\0';
+
+    fclose(input);
+
+    return buffer;
+}
+
+//----------------------------------------------------
+
+char** makeText (char* storage, int nStr)
+{
+
+    char*  read  = storage;
+    char** tempText = (char**) calloc (nStr + 1, sizeof(*tempText));
+    char** returnText = tempText;
+    nStr++;
+
+    while (nStr > 0)
+    {
+        if (*(read) == '\n')
+        {
+            *(read) = '\0';
+            *tempText++ = read;
+            nStr--;
+        }
+
+        if(*(read) == '\0')
+        {
+            *tempText++ = read;
+            nStr--;
+        }
+
+        read++;
+    }
+    return returnText;
+}
+
+//-----------------------------------------------------------------
+
+void testGetFileSize (const char* fileName, int sz)
+{
+    struct stat buff;
+    stat( fileName, &buff);
+    (buff.st_size >= sz) ? : printf("test failed %s\n", fileName) ;
+}
+
+//-----------------------------------------------------------------
+
+void testMakeText (char** text, char* storage, char* exampleS, int nStr)
+{
+    makeText (storage, nStr);
+    char** cursor = text;
+    char*  tryStr;
+    for (int i = 0; i < nStr; i++)
+    {
+        for (int j = 0; ;j++)
+        {
+            if(*(*(cursor + i) + j) == '\0')
+            {
+                *tryStr++ = '\n';
+                break;
+            }
+            *tryStr++ = *(*(cursor + i) + j);
+        }
+    }
+
+    if(strcmp(tryStr,exampleS))
+        printf("text making failed");
+}
+
+//------------------------------------------------------------------
+
+int deleteSpaces (char* storage)
+{
+    char* read  = storage;
+    char* write = storage;
+    int nStr = 1;
+
+    read++;
+    write++;
+
+    if (*read == '\0')
+        return 0;
+
+    while (*read != '\0')
+    {
+
+        while (*read == '\n' && *(read+2) == '\n' )
+            read++;
+
+        if ( *read == '\n' )
+        {
+            *write++ = '\0';
+            nStr++;
+            read++;
+            continue;
+        }
+
+        *write++ = *read++;
+
+    }
+
+
+
+    return nStr;
+
+}
+
+//-----------------------------------------------------------------
+
+int strCompareStraight (const char* str1, const char* str2)
+{
+    const char* read1 = str1 + 1;
+    const char* read2 = str2 + 1;
+
+    while (1)
+    {
+        while (!(isalpha(*(read1))) && (*(read1) != '\0') && !(isspace(*read1)))
+            read1++;
+
+        while (!(isalpha(*(read2))) && (*(read2) != '\0') && !(isspace(*read2)))
+            read2++;
+
+        char tempSymb1 = tolower (*read1);
+        char tempSymb2 = tolower (*read2);
+
+        if ((tempSymb1 == '\0') || (tempSymb2 == '\0'))
+            return tempSymb1 - tempSymb2;
+
+        if ((tempSymb1) == (tempSymb2))
+        {
+            read1++;
+            read2++;
+            continue;
+        }
+
+        return tempSymb1 - tempSymb2;
+
+    }
+}
+
+//-------------------------------------------------------------------
+
+int straightComparator (const void* member1, const void* member2)
+{
+    return strCompareStraight (*(char**) member1, *(char**) member2);
+}
+
+//--------------------------------------------------------------------
+
+void showText (char** text, int nStr)
+{
+    for (int i = 0; i < nStr; i++)
+    {
+        char* str = *(text);
+        str++;
+        printf ("%s\n",str);
+        text++;
+    }
+}
+
+//--------------------------------------------------------------------
+
+void textOutputStraight (char** text,const int nStr, const char* fileName)
+{
+    FILE* output = fopen(fileName, "wb");
+    char** tempText = text;
+    for (int i = 0; i < nStr; i++)
+    {
+        char* str = *(tempText);
+        str++;
+
+        while ( *str != '\0')
+        {
+            fputc (*str, output);
+            str++;
+        }
+        tempText++;
+    }
+
+    fclose(output);
+}
+
+//--------------------------------------------------------------------
+
+void storageOutput (char* storage, const int nStr, const char* fileName)
+{
+    FILE* output = fopen(fileName, "wb");
+    char* tempstr = storage;
+    for (int i = 0; i < nStr; i++)
+    {
+        tempstr++;
+
+        while ( *tempstr != '\0')
+        {
+            fputc (*tempstr, output);
+            tempstr++;
+        }
+
+    }
+
+    fclose(output);
+}
+
+//------------------------------------------------------------------------
+
+int strCompareReverse (const char* str1, const char* str2)
+{
+    const char* read1 = str1 - 1;
+    const char* read2 = str2 - 1;
+
+    while (1)
+    {
+        while (!(isalpha(*(read1))) && (*(read1) != '\0') && !(isspace(*read1)))
+            read1--;
+
+        while (!(isalpha(*(read2))) && (*(read2) != '\0') && !(isspace(*read2)))
+            read2--;
+
+        char tempSymb1 = tolower (*read1);
+        char tempSymb2 = tolower (*read2);
+
+        if ((tempSymb1 == '\0') || (tempSymb2 == '\0'))
+            return tempSymb1 - tempSymb2;
+
+        if ((tempSymb1) == (tempSymb2))
+        {
+            read1--;
+            read2--;
+            continue;
+        }
+
+        return tempSymb1 - tempSymb2;
+
+    }
+}
+
+//---------------------------------------------------------------------------
+
+int reverseComporator  (const void* member1, const void* member2)
+{
+    return strCompareReverse (*(char**) member1, *(char**) member2);
+}
+
+//---------------------------------------------------------------------------
+
+void textOutputReverse  (char** text,const int nStr, const char* fileName)
+{
+    FILE* output = fopen(fileName, "wb");
+    char** tempText = text;
+
+    for (int i = 0; i < nStr; i++)
+    {
+        char* str = *(tempText);
+        str--;
+
+        while (*str != '\0')
+            str--;
+
+        str++;
+
+        while ( *str != '\0')
+        {
+            fputc (*str, output);
+            str++;
+        }
+        tempText++;
+    }
+
+    fclose(output);
+}
+
